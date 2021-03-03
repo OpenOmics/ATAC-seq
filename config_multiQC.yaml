@@ -1,0 +1,51 @@
+extra_fn_clean_exts:
+   - type: remove
+     pattern: _bowtie2.err
+fn_ignore_dirs:
+    - 'ChIPseeker_combine'
+    - 'Genrich_combine'
+table_columns_visible:
+    FastQC:
+        percent_duplicates: False
+
+module_order:
+    - featureCounts:
+        name: 'FRiP Score'
+fn_ignore_files:
+   - 'table.txt'
+   - '*_1p_Log.*'
+exclude_modules:
+   - featurecounts
+
+
+table_columns_visible:
+     FastQC:
+         percent_duplicates: False
+table_columns_visible:
+    FastQC (raw):
+        percent_duplicates: False
+        percent_gc: False
+    FastQC (trimmed):
+        percent_duplicates: False
+        percent_gc: False
+
+module_order:
+    - fastqc:
+        name: 'FastQC (raw)'
+        path_filters:
+            - '*R1_fastqc.zip'
+            - '*R2_fastqc.zip'
+    - fastqc:
+        name: 'FastQC (trimmed)'
+        info: 'This section of the report shows FastQC results after adapter trimming.'
+        target: ''
+        path_filters:
+            - '*trimmed_R1_fastqc.zip'
+            - '*trimmed_R2_fastqc.zip'
+
+
+fastqscreen_simpleplot: true
+
+remove_sections:
+    - fastqc_status_checks
+    - fastqc_status_checks-1
