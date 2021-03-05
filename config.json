@@ -1,0 +1,8 @@
+{ "ref": "hg38",
+  "projectID": "NCBR-test",
+  "groups": { "EV": ["EVp1", "EVp3", "EVp5"],
+              "OE": ["OEp2", "OEp4", "OEp6"]
+            },
+  "contrasts": { "1": ["OE", "EV"]
+               }
+}

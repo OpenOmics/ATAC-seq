@@ -21,4 +21,5 @@ where workdirectory is the full path to the working directory and referencegenom
 
 Some notes:
 - This is currently set up to treat each ATAC-seq sample independently. There is code from SF to run replicates as a set through Genrich, but it has not be incorporated yet.
-- This pipeline currently is only to be able to create a set of files that are analogous to what you would get from SF for ATAC-seq data. It does not include any extra downstream steps as yet.
+
+Group names may not contain any of the following symbols: "-" "." "_"

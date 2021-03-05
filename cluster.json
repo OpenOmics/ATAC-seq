@@ -68,5 +68,14 @@
     },
     "featureCounts": {
         "threads": "8"
+    },
+    "diffbind": {
+        "threads": "10"
+    },
+    "HOMER_motif": {
+        "threads": "48"
+    },
+    "UROPA": {
+        "threads": "4"
     }
 }

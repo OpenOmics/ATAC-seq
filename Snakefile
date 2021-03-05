@@ -1,17 +1,20 @@
 import os,re
 from os import listdir
 import glob
+import json
 
-import config
 import program
 import reference
 
-with open(config.analysis + '/cluster.json') as file:
+wdir = os.getcwd()
+sourcedir = wdir + "/fastq/"
+
+with open(wdir+ '/cluster.json') as file:
     clusterConfig = json.load(file)
 
+with open(wdir+ '/config.json') as file:
+    config = json.load(file)
 
-wdir = config.analysis
-sourcedir = config.analysis + "/fastq/"
 
 # this script currently assumes that naming is _R1.fastq.gz
 sample = [os.path.basename(file).split('.')[0] for file in glob.glob(sourcedir+'/*')]
@@ -28,8 +31,8 @@ for item in samps:
 samples = new
 
 
-if not os.path.isfile(config.analysis + '/metadata.txt'):
-    rule all:
+#if not os.path.isfile(config.analysis + '/metadata.txt'):
+rule all:
         input:  expand(wdir + "/QC/{sample}_trimmed_R1_fastqc.html", sample=samples),
                 expand(wdir + "/QC/{sample}_R1_fastqc.html", sample=samples),
                 expand(wdir + "/bam/{sample}.sorted.markdup.bam.bai", sample=samples),
@@ -152,7 +155,7 @@ rule markdupIndex:
     output:wdir+ "/bam/{sample}.sorted.markdup.bam.bai"
     shell: "module load {program.samtools}; samtools index {input}"
 
-if config.ref == "rheMac10":
+if config["ref"] == "rheMac10":
     rule genrich:
         input: wdir+"/bam/{sample}.sortedByRead.bam"
         output: genrich = wdir+"/Genrich/{sample}.narrowPeak.tmp", 
@@ -350,7 +353,7 @@ rule fripScore:
 rule ChIPseeker:
     input: expand(wdir + "/Genrich/{sample}.narrowPeak", sample=samples)
     output: wdir + "/Genomic_Annotation_among_different_ATACseq_data_mqc.png"
-    shell: "module load {program.rver}; Rscript {program.chipseeker} {config.ref} {input}"
+    shell: "module load {program.rver}; Rscript {program.chipseeker} {config[ref]} {input}"
 
 rule multiqc:
     input: expand(wdir + "/bam/{sample}.sorted.markdup.bam", sample=samples), 

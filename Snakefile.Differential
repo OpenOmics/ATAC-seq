@@ -1,0 +1,165 @@
+# setting this up to work for mouse and human, needs to be adapted for Rhesus macaque
+
+import os,re
+from os import listdir
+from os.path import join
+import glob
+import json
+
+import program
+import reference
+
+wdir = os.getcwd()
+sourcedir = wdir + "/fastq/"
+
+
+with open(wdir + '/cluster.json') as file:
+    clusterConfig = json.load(file)
+
+with open(wdir+ '/config.json') as file:
+    config = json.load(file)
+
+# this script currently assumes that naming is _R1.fastq.gz
+sample = [os.path.basename(file).split('.')[0] for file in glob.glob(sourcedir+'/*')]
+
+samps = []
+for item in sample:
+        newvar = item.split("_R1")
+        othervar = item.split("_R2")
+        samps.append(newvar[0])
+new = []
+for item in samps:
+        if '_R2' not in item:
+                new.append(item)
+samples = new
+
+#### need to get group and contrast information incorporated here
+# missing variables from rule all: contrasts
+
+PeakTools = ['DiffbindEdgeR','DiffbindDeseq2']
+UropaCats = ["genes","prot","TSSgenes","TSSprot"]
+Directions =["_pos","_neg",""]
+
+DiffBind_Dir = "DiffBind"
+Uropa_Dir = "Uropa"
+Homer_Dir = "Homer_motifs"
+
+def zip_contrasts(contrast):
+    """making output file names for differential binding analyses"""
+    zipGroup1, zipGroup2, contrasts = [], [], []
+    for g1, g2 in contrast:
+        zipGroup1.append(g1)
+        zipGroup2.append(g2)
+        contrasts.append( g1 + "_vs_" + g2)
+    return( zipGroup1, zipGroup2, contrasts )
+
+contrast = list(config["contrasts"].values())
+groupdata = config["groups"]
+zipGroup1, zipGroup2, contrasts = zip_contrasts(contrast)
+
+# because I am grabbing code from a previous location sometimes group1 and group2 are written separately and sometimes that are combined as a single contrast
+# "sample" always is individual sample identifier while "name" may refer to a contrast
+rule all:
+    input: expand(join(wdir, Uropa_Dir,'{name}-{PeakTool}_uropa_{type}_allhits.txt'),PeakTool=PeakTools,name=contrasts,type=UropaCats),
+           expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),
+           expand(join(wdir,Homer_Dir,"{name}-{PeakTool}{direction}_gw"),direction=Directions,PeakTool=PeakTools,name=contrasts),
+
+# this is to allow the dryrun even though the first half of the pipeline doesn't exist
+rule tmp:
+        input: R1 = sourcedir + "{sample}_R1.fastq.gz", 
+               R2 = sourcedir + "{sample}_R2.fastq.gz"
+        output: wdir +"/bam/{sample}.sorted.markdup.bam",
+                wdir+"/Genrich/{sample}.narrowPeak"
+        shell:"ls"
+
+# need to update output bed files: there will be 3: positive, negative, and all. bed file all is the only one that should be an input for uropa, but all three are inputs for Homer
+# consensus output bed files are also created in the DiffBind script but they have no function downstream so they are not needed in the list of outputs
+
+rule diffbind:
+    input:
+        expand(wdir +"/bam/{sample}.sorted.markdup.bam",sample=samples),
+        expand(wdir+"/Genrich/{sample}.narrowPeak",sample=samples)
+    output:
+        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + ".txt"),
+        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + ".txt"),
+        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + ".bed"),
+        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + ".bed"),
+        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + Directions[0] + ".bed"),
+        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + Directions[1] + ".bed"),
+        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + Directions[0] + ".bed"),
+        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + Directions[1] + ".bed"),
+        html= join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),
+    params:
+        rname="pl:diffbind",
+        projectID = config["projectID"],
+        outdir = join(wdir,DiffBind_Dir,"{group1}_vs_{group2}"),
+        contrast = "{group1}_vs_{group2}",
+        csvfile = join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind_prep.csv"),
+    run:
+        samplesheet = [",".join(["SampleID","Condition", "Replicate", "bamReads", 
+                      "Peaks", "PeakCaller"])]
+        for condition in wildcards.group1,wildcards.group2:
+            for samplename in groupdata[condition]:
+                replicate = str([ i + 1 for i in range(len(groupdata[condition])) if groupdata[condition][i] == samplename][0])
+                bamReads = join(wdir, "bam", samplename + ".sorted.markdup.bam")
+                peaks = join(wdir, "Genrich", samplename + ".narrowPeak")
+                samplesheet.append(",".join([samplename, condition, replicate, bamReads, peaks, "narrowPeak"]))
+        f = open(params.csvfile, 'w')
+        f.write ("\n".join(samplesheet))
+        f.close()
+        cmd1 = "module load {program.RverDB}; cp {program.DBrscript2} {params.outdir}; cd {params.outdir}; "
+        cmd2 = "Rscript {program.DBrscript1} '.' {output.html} {params.csvfile} '{params.contrast}' 'Genrich' '{params.projectID}'"
+        shell( cmd1 + cmd2 )
+
+# homer may actually work for RheMac10...
+# this still needs new inputs/outputs
+rule HOMER_motif:
+    input:
+        join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}{direction}.bed")
+    output:
+        join(wdir,Homer_Dir,"{name}-{PeakTool}{direction}_gw")
+    params:
+        rname="pl:HOMER_motif",
+    shell: """
+module load {program.homerver} 
+findMotifsGenome.pl {input} {config[ref]} {output} -size given -p {clusterConfig[HOMER_motif][threads]} -len 8,10 -preparsedDir /lscratch/$SLURM_JOBID
+"""
+
+# won't work with available RheMac gtf file
+rule UROPA:
+    input:
+        join(wdir, DiffBind_Dir,"{name}","{name}-{PeakTool}.bed")
+    output:
+        join(wdir, Uropa_Dir,'{name}-{PeakTool}_uropa_{type}_allhits.txt')
+    params:
+        rname="pl:uropa",
+        fldr = join(wdir, Uropa_Dir),
+        json = join(wdir, Uropa_Dir, '{name}.{PeakTool}.{type}.json'),
+        outroot = join(wdir, Uropa_Dir, '{name}_{PeakTool}_uropa_{type}'),
+    shell: """
+module load {program.uropaver};
+if [ ! -e {params.fldr} ]; then mkdir {params.fldr}; fi
+echo '{{"queries":[ ' > {params.json}
+if [ '{wildcards.type}' == 'prot' ]; then
+     echo '      {{ "feature":"gene","distance":5000,"filter.attribute":"gene_type","attribute.value":"protein_coding","show.attributes":["gene_id", "gene_name","gene_type"] }},' >> {params.json}
+     echo '      {{ "feature":"gene","filter.attribute":"gene_type","attribute.value":"protein_coding","show.attributes":["gene_id", "gene_name","gene_type"] }}],' >> {params.json}
+elif [ '{wildcards.type}' == 'genes' ]; then
+     echo '      {{ "feature":"gene","distance":5000,"show.attributes":["gene_id", "gene_name","gene_type"] }},' >> {params.json}
+     echo '      {{ "feature":"gene","show.attributes":["gene_id", "gene_name","gene_type"] }}],' >> {params.json}
+elif [ '{wildcards.type}' == 'TSSprot' ]; then
+     echo '      {{ "feature":"gene","distance":[3000,500],"filter.attribute":"gene_type","attribute.value":"protein_coding","feature.anchor":"start","show.attributes":["gene_id", "gene_name","gene_type"] }},' >> {params.json}
+     echo '      {{ "feature":"gene","distance":3000,"filter.attribute":"gene_type","attribute.value":"protein_coding","feature.anchor":"end","show.attributes":["gene_id", "gene_name","gene_type"] }},' >> {params.json}
+     echo '      {{ "feature":"gene","distance":100000,"filter.attribute":"gene_type","attribute.value":"protein_coding","feature.anchor":"center","show.attributes":["gene_id", "gene_name","gene_type"] }},' >> {params.json}
+     echo '      {{ "feature":"gene","distance":100000,"filter.attribute":"gene_type","attribute.value":"protein_coding","show.attributes":["gene_id", "gene_name","gene_type"] }}],' >> {params.json}
+else
+     echo '      {{ "feature":"gene","distance":[3000,500],"feature.anchor":"start","show.attributes":["gene_id", "gene_name","gene_type"] }},' >> {params.json}
+     echo '      {{ "feature":"gene","distance":3000,"feature.anchor":"end","show.attributes":["gene_id", "gene_name","gene_type"] }},' >> {params.json}
+     echo '      {{ "feature":"gene","distance":100000,"feature.anchor":"center","show.attributes":["gene_id", "gene_name","gene_type"] }},' >> {params.json}
+     echo '      {{ "feature":"gene","distance":100000,"show.attributes":["gene_id", "gene_name","gene_type"] }}],' >> {params.json}
+fi
+echo '"priority":"Yes",' >> {params.json}
+echo '"gtf":"{reference.gtf}",' >> {params.json}
+echo '"bed": "{input}" }}' >> {params.json}
+uropa -i {params.json} -p {params.outroot} -t {clusterConfig[UROPA][threads]} -s
+"""
+
