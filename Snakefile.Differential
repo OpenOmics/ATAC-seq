@@ -36,7 +36,7 @@ samples = new
 #### need to get group and contrast information incorporated here
 # missing variables from rule all: contrasts
 
-PeakTools = ['DiffbindEdgeR','DiffbindDeseq2']
+PeakTools = ['Diffbind_EdgeR','Diffbind_Deseq2']
 UropaCats = ["genes","prot","TSSgenes","TSSprot"]
 Directions =["_pos","_neg",""]
 
@@ -60,9 +60,10 @@ zipGroup1, zipGroup2, contrasts = zip_contrasts(contrast)
 # because I am grabbing code from a previous location sometimes group1 and group2 are written separately and sometimes that are combined as a single contrast
 # "sample" always is individual sample identifier while "name" may refer to a contrast
 rule all:
-    input: expand(join(wdir, Uropa_Dir,'{name}-{PeakTool}_uropa_{type}_allhits.txt'),PeakTool=PeakTools,name=contrasts,type=UropaCats),
-           expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),
-           expand(join(wdir,Homer_Dir,"{name}-{PeakTool}{direction}_gw"),direction=Directions,PeakTool=PeakTools,name=contrasts),
+    input: expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2)
+	#expand(join(wdir, Uropa_Dir,'{name}-{PeakTool}_uropa_{type}_allhits.txt'),PeakTool=PeakTools,name=contrasts,type=UropaCats),
+	#expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),	
+	#expand(join(wdir,Homer_Dir,"{name}-{PeakTool}{direction}_gw"),direction=Directions,PeakTool=PeakTools,name=contrasts),
 
 # this is to allow the dryrun even though the first half of the pipeline doesn't exist
 rule tmp:
@@ -80,15 +81,15 @@ rule diffbind:
         expand(wdir +"/bam/{sample}.sorted.markdup.bam",sample=samples),
         expand(wdir+"/Genrich/{sample}.narrowPeak",sample=samples)
     output:
-        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + ".txt"),
-        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + ".txt"),
-        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + ".bed"),
-        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + ".bed"),
-        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + Directions[0] + ".bed"),
-        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + Directions[1] + ".bed"),
-        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + Directions[0] + ".bed"),
-        join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + Directions[1] + ".bed"),
-        html= join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),
+        outtxt0=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + ".txt"),
+        outtxt1=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + ".txt"),
+        outbed0=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + ".bed"),
+        outbed1=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + ".bed"),
+       	outbedpos0=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + Directions[0] + ".bed"),
+	outbedneg0=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + Directions[1] + ".bed"),
+        outbedpos1=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + Directions[0] + ".bed"),
+        outbedneg1=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + Directions[1] + ".bed"),
+        html=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),
     params:
         rname="pl:diffbind",
         projectID = config["projectID"],
@@ -107,9 +108,15 @@ rule diffbind:
         f = open(params.csvfile, 'w')
         f.write ("\n".join(samplesheet))
         f.close()
-        cmd1 = "module load {program.RverDB}; cp {program.DBrscript2} {params.outdir}; cd {params.outdir}; "
-        cmd2 = "Rscript {program.DBrscript1} '.' {output.html} {params.csvfile} '{params.contrast}' 'Genrich' '{params.projectID}'"
-        shell( cmd1 + cmd2 )
+        cmd1 = "module load {program.RverDB}; cp {program.DBrscript1} {params.outdir}; cp {program.DBrscript2} {params.outdir}; cd {params.outdir}; "
+        cmd2 = "Rscript {program.DBrscript1} '.' {output.html} {params.csvfile} '{params.contrast}' 'Genrich' '{params.projectID}';"
+	cmd3 = "awk -v OFS='\\t' '{{ if (NR>1) print $1,$2,$3,\"Peak_\"(NR-1)}}' {output.outtxt0} > {output.outbed0};"
+	cmd4 = "awk -v OFS='\\t' '{{ if (NR>1) print $1,$2,$3,\"Peak_\"(NR-1)}}' {output.outtxt1} > {output.outbed1};"
+	cmd5 = "awk -v OFS='\\t' '{{ if ((NR>1) && ($9 >= 0)) print $1,$2,$3,\"Peak_\"(NR-1)}}' {output.outtxt0} > {output.outbedpos0};"
+	cmd6 = "awk -v OFS='\\t' '{{ if ((NR>1) && ($9 < 0)) print $1,$2,$3,\"Peak_\"(NR-1)}}' {output.outtxt0} > {output.outbedneg0};"
+	cmd7 = "awk -v OFS='\\t' '{{ if ((NR>1) && ($9 >= 0)) print $1,$2,$3,\"Peak_\"(NR-1)}}' {output.outtxt1} > {output.outbedpos1};"
+	cmd8 = "awk -v OFS='\\t' '{{ if ((NR>1) && ($9 < 0)) print $1,$2,$3,\"Peak_\"(NR-1)}}' {output.outtxt1} > {output.outbedneg1};"
+	shell( cmd1 + cmd2 + cmd3 + cmd4 + cmd5 + cmd6 + cmd7 + cmd8 )
 
 # homer may actually work for RheMac10...
 # this still needs new inputs/outputs

@@ -176,14 +176,14 @@ try(dba.plotBox(DBAnalysisEdgeR, method = DBA_EDGER),silent=TRUE)
 
 ## Differentially bound peaks: Deseq2 output
 ```{r Deseq2Report, echo=FALSE, warning=FALSE,message=FALSE}
-outfile <- paste0(contrasts, "-", peakcaller, "_Diffbind_Deseq2.txt")
+outfile <- paste0(contrasts, "-Diffbind_Deseq2.txt")
 write.table(DBReportDeseq2, outfile, quote=F, sep="\t", row.names=F)
 DT::datatable(data.frame(DBReportDeseq2), rownames=F)
 ```
 
 ## Differentially bound peaks: EdgeR output
 ```{r EdgeRReport, echo=FALSE, warning=FALSE,message=FALSE}
-outfile <- paste0(contrasts, "-", peakcaller,"_Diffbind_EdgeR.txt")
+outfile <- paste0(contrasts, "-Diffbind_EdgeR.txt")
 write.table(DBReportEdgeR, outfile, quote=F, sep="\t", row.names=F)
 DT::datatable(data.frame(DBReportEdgeR), rownames=F)
 ```
