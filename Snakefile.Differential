@@ -60,10 +60,10 @@ zipGroup1, zipGroup2, contrasts = zip_contrasts(contrast)
 # because I am grabbing code from a previous location sometimes group1 and group2 are written separately and sometimes that are combined as a single contrast
 # "sample" always is individual sample identifier while "name" may refer to a contrast
 rule all:
-    input: expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2)
-	#expand(join(wdir, Uropa_Dir,'{name}-{PeakTool}_uropa_{type}_allhits.txt'),PeakTool=PeakTools,name=contrasts,type=UropaCats),
-	#expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),	
-	#expand(join(wdir,Homer_Dir,"{name}-{PeakTool}{direction}_gw"),direction=Directions,PeakTool=PeakTools,name=contrasts),
+    input:
+        expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),
+        expand(join(wdir,Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits.txt"),name=contrasts,PeakTool=PeakTools,type=UropaCats),
+        expand(join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}","knownResults.txt"),PeakTool=PeakTools,name=contrasts)
 
 # this is to allow the dryrun even though the first half of the pipeline doesn't exist
 rule tmp:
@@ -89,7 +89,7 @@ rule diffbind:
 	outbedneg0=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + Directions[1] + ".bed"),
         outbedpos1=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + Directions[0] + ".bed"),
         outbedneg1=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[1] + Directions[1] + ".bed"),
-        html=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),
+        html=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html")
     params:
         rname="pl:diffbind",
         projectID = config["projectID"],
@@ -122,27 +122,40 @@ rule diffbind:
 # this still needs new inputs/outputs
 rule HOMER_motif:
     input:
-        join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}{direction}.bed")
+        inbase=join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}.bed"),
+        inpos=join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}" + Directions[0] + ".bed"),
+        inneg=join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}" + Directions[1] + ".bed")
     output:
-        join(wdir,Homer_Dir,"{name}-{PeakTool}{direction}_gw")
+        outbase=join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}","knownResults.txt"),
+        outpos=join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}" + Directions[0],"knownResults.txt"),
+        outneg=join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}" + Directions[1],"knownResults.txt")
     params:
-        rname="pl:HOMER_motif",
+        parbase=join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}"),
+        parpos=join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}" + Directions[0]),
+        parneg=join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}" + Directions[1]),
+        rname="pl:HOMER_motif"
     shell: """
 module load {program.homerver} 
-findMotifsGenome.pl {input} {config[ref]} {output} -size given -p {clusterConfig[HOMER_motif][threads]} -len 8,10 -preparsedDir /lscratch/$SLURM_JOBID
+findMotifsGenome.pl {input.inbase} {config[ref]} {params.parbase} -size given -p {clusterConfig[HOMER_motif][threads]} -len 8,10 -preparsedDir /lscratch/$SLURM_JOBID
+findMotifsGenome.pl {input.inpos} {config[ref]} {params.parpos} -size given -p {clusterConfig[HOMER_motif][threads]} -len 8,10 -preparsedDir /lscratch/$SLURM_JOBID
+findMotifsGenome.pl {input.inneg} {config[ref]} {params.parneg} -size given -p {clusterConfig[HOMER_motif][threads]} -len 8,10 -preparsedDir /lscratch/$SLURM_JOBID
 """
 
 # won't work with available RheMac gtf file
 rule UROPA:
     input:
-        join(wdir, DiffBind_Dir,"{name}","{name}-{PeakTool}.bed")
+        bed=join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}.bed"),
+        txt=join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}.txt")
     output:
-        join(wdir, Uropa_Dir,'{name}-{PeakTool}_uropa_{type}_allhits.txt')
+        outbase=join(wdir, Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits.txt"),
+	outmergebase=join(wdir, Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits.merged.txt"),
+	outmergepos=join(wdir, Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits" + Directions[0] + ".txt"),
+	outmergeneg=join(wdir, Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits" + Directions[1] + ".txt")
     params:
         rname="pl:uropa",
-        fldr = join(wdir, Uropa_Dir),
-        json = join(wdir, Uropa_Dir, '{name}.{PeakTool}.{type}.json'),
-        outroot = join(wdir, Uropa_Dir, '{name}_{PeakTool}_uropa_{type}'),
+        fldr = join(wdir, Uropa_Dir,"{name}"),
+        json = join(wdir, Uropa_Dir,"{name}","{name}.{PeakTool}.{type}.json"),
+        outroot = join(wdir, Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}")
     shell: """
 module load {program.uropaver};
 if [ ! -e {params.fldr} ]; then mkdir {params.fldr}; fi
@@ -166,7 +179,13 @@ else
 fi
 echo '"priority":"Yes",' >> {params.json}
 echo '"gtf":"{reference.gtf}",' >> {params.json}
-echo '"bed": "{input}" }}' >> {params.json}
+echo '"bed": "{input.bed}" }}' >> {params.json}
 uropa -i {params.json} -p {params.outroot} -t {clusterConfig[UROPA][threads]} -s
+module load {program.RverDB}
+cp {program.Mergerscript} {params.fldr}
+cd {params.fldr}
+Rscript {program.Mergerscript} {input.txt} {output.outbase}
+awk -F'\\t' '{{if (NR==1) print $0; else if ((NR>1) && ($8>=0)) print $0}}' {output.outmergebase} > {output.outmergepos}
+awk -F'\\t' '{{if (NR==1) print $0; else if ((NR>1) && ($8<0)) print $0}}' {output.outmergebase} > {output.outmergeneg}
 """
 

@@ -35,7 +35,7 @@ if (genome == "mm10") {
 
 input <- args[2:length(args)]
 input1 <- input[sapply(input, file.size) > 0]
-nm <- lapply(gsub('.narrowPeak', '' , lapply(gsub('Genrich/', '', input1), function(x) (x))), function(y) (y))
+nm <- lapply(gsub('.narrowPeak', '' , lapply(gsub('.*/Genrich/', '', input1), function(x) (x))), function(y) (y))
 
 print (input1)
 names(input1) <- nm
