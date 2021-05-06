@@ -43,6 +43,7 @@ Directions =["_pos","_neg",""]
 DiffBind_Dir = "DiffBind"
 Uropa_Dir = "Uropa"
 Homer_Dir = "Homer_motifs"
+Homer_Dir2 = "Homer_annotations"
 
 def zip_contrasts(contrast):
     """making output file names for differential binding analyses"""
@@ -59,11 +60,19 @@ zipGroup1, zipGroup2, contrasts = zip_contrasts(contrast)
 
 # because I am grabbing code from a previous location sometimes group1 and group2 are written separately and sometimes that are combined as a single contrast
 # "sample" always is individual sample identifier while "name" may refer to a contrast
-rule all:
-    input:
-        expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),
-        expand(join(wdir,Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits.txt"),name=contrasts,PeakTool=PeakTools,type=UropaCats),
-        expand(join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}","knownResults.txt"),PeakTool=PeakTools,name=contrasts)
+if config["ref"] == "rheMac10":
+    rule all:
+        input:
+            expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),
+            expand(join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}","knownResults.txt"),PeakTool=PeakTools,name=contrasts),
+            expand(join(wdir,Homer_Dir2,"{name}","{name}-{PeakTool}.annotations.merged.txt"),PeakTool=PeakTools,name=contrasts)
+else:
+    rule all:
+        input:
+            expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),
+            expand(join(wdir,Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits.txt"),name=contrasts,PeakTool=PeakTools,type=UropaCats),
+            expand(join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}","knownResults.txt"),PeakTool=PeakTools,name=contrasts),
+
 
 # this is to allow the dryrun even though the first half of the pipeline doesn't exist
 rule tmp:
@@ -108,7 +117,7 @@ rule diffbind:
         f = open(params.csvfile, 'w')
         f.write ("\n".join(samplesheet))
         f.close()
-        cmd1 = "module load {program.RverDB}; cp {program.DBrscript1} {params.outdir}; cp {program.DBrscript2} {params.outdir}; cd {params.outdir}; "
+        cmd1 = "module load {program.RverDB}; cp Scripts/{program.DBrscript1} {params.outdir}; cp Scripts/{program.DBrscript2} {params.outdir}; cd {params.outdir}; "
         cmd2 = "Rscript {program.DBrscript1} '.' {output.html} {params.csvfile} '{params.contrast}' 'Genrich' '{params.projectID}';"
 	cmd3 = "awk -v OFS='\\t' '{{ if (NR>1) print $1,$2,$3,\"Peak_\"(NR-1)}}' {output.outtxt0} > {output.outbed0};"
 	cmd4 = "awk -v OFS='\\t' '{{ if (NR>1) print $1,$2,$3,\"Peak_\"(NR-1)}}' {output.outtxt1} > {output.outbed1};"
@@ -118,8 +127,6 @@ rule diffbind:
 	cmd8 = "awk -v OFS='\\t' '{{ if ((NR>1) && ($9 < 0)) print $1,$2,$3,\"Peak_\"(NR-1)}}' {output.outtxt1} > {output.outbedneg1};"
 	shell( cmd1 + cmd2 + cmd3 + cmd4 + cmd5 + cmd6 + cmd7 + cmd8 )
 
-# homer may actually work for RheMac10...
-# this still needs new inputs/outputs
 rule HOMER_motif:
     input:
         inbase=join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}.bed"),
@@ -139,6 +146,30 @@ module load {program.homerver}
 findMotifsGenome.pl {input.inbase} {config[ref]} {params.parbase} -size given -p {clusterConfig[HOMER_motif][threads]} -len 8,10 -preparsedDir /lscratch/$SLURM_JOBID
 findMotifsGenome.pl {input.inpos} {config[ref]} {params.parpos} -size given -p {clusterConfig[HOMER_motif][threads]} -len 8,10 -preparsedDir /lscratch/$SLURM_JOBID
 findMotifsGenome.pl {input.inneg} {config[ref]} {params.parneg} -size given -p {clusterConfig[HOMER_motif][threads]} -len 8,10 -preparsedDir /lscratch/$SLURM_JOBID
+"""
+
+rule HOMER_annot:
+    input:
+        bed=join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}.bed"),
+        txt=join(wdir,DiffBind_Dir,"{name}","{name}-{PeakTool}.txt")
+    output:
+        outbase=join(wdir,Homer_Dir2,"{name}","{name}-{PeakTool}.annotations.txt"),
+        outmergebase=join(wdir, Homer_Dir2,"{name}","{name}-{PeakTool}.annotations.merged.txt"),
+        outmergepos=join(wdir, Homer_Dir2,"{name}","{name}-{PeakTool}.annotations." + Directions[0] + ".txt"),
+        outmergeneg=join(wdir, Homer_Dir2,"{name}","{name}-{PeakTool}.annotations." + Directions[1] + ".txt")
+    params:
+        rname="pl:HOMER_annot",
+        fldr = join(wdir, Homer_Dir2,"{name}"),
+    shell: """
+module load {program.homerver}
+annotatePeaks.pl {input.bed} {config[ref]} > {output.outbase}
+
+module load {program.RverDB}
+cp Scripts/{program.Merge2rscript} {params.fldr}
+cd {params.fldr}
+Rscript {program.Merge2rscript} {input.txt} {output.outbase}
+awk -F'\\t' '{{if (NR==1) print $0; else if ((NR>1) && ($7>=0)) print $0}}' {output.outmergebase} > {output.outmergepos}
+awk -F'\\t' '{{if (NR==1) print $0; else if ((NR>1) && ($7<0)) print $0}}' {output.outmergebase} > {output.outmergeneg}
 """
 
 # won't work with available RheMac gtf file
@@ -182,7 +213,7 @@ echo '"gtf":"{reference.gtf}",' >> {params.json}
 echo '"bed": "{input.bed}" }}' >> {params.json}
 uropa -i {params.json} -p {params.outroot} -t {clusterConfig[UROPA][threads]} -s
 module load {program.RverDB}
-cp {program.Mergerscript} {params.fldr}
+cp Scripts/{program.Mergerscript} {params.fldr}
 cd {params.fldr}
 Rscript {program.Mergerscript} {input.txt} {output.outbase}
 awk -F'\\t' '{{if (NR==1) print $0; else if ((NR>1) && ($8>=0)) print $0}}' {output.outmergebase} > {output.outmergepos}

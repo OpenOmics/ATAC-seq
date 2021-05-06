@@ -67,8 +67,12 @@ try(dba.plotPCA(samples,DBA_CONDITION),silent=TRUE)
 if (nrow(samples$samples) < 5) {
    dba.plotVenn(samples,1:nrow(samples$samples)) 
 } else {
-   dba.plotVenn(samples,samples$masks[[3]])
-   dba.plotVenn(samples,samples$masks[[4]])
+   if (sum(samples$masks[[3]]) < 5) {
+     dba.plotVenn(samples,samples$masks[[3]])
+   }
+   if (sum(samples$masks[[4]]) < 5) {
+     dba.plotVenn(samples,samples$masks[[4]])
+   }
    dba.plotVenn(consensus,consensus$masks$Consensus)
 }
 ```

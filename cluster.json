@@ -57,7 +57,8 @@
         "threads": "16"
     },
     "plotGeneHeat": {
-        "mem": "128g"
+        "mem": "128g",
+        "threads":"16"
     },
     "alignmentSieve": {
         "mem": "64g",
@@ -70,7 +71,8 @@
         "threads": "8"
     },
     "diffbind": {
-        "threads": "10"
+        "threads": "10",
+        "mem":"65g"
     },
     "HOMER_motif": {
         "threads": "48"

@@ -35,6 +35,10 @@ module_order:
         path_filters:
             - '*R1_fastqc.zip'
             - '*R2_fastqc.zip'
+        path_filters_exclude:
+            - '*trimmed_R1_fastqc.zip'
+            - '*trimmed_R2_fastqc.zip'
+
     - fastqc:
         name: 'FastQC (trimmed)'
         info: 'This section of the report shows FastQC results after adapter trimming.'

@@ -33,8 +33,8 @@ samples = new
 
 #if not os.path.isfile(config.analysis + '/metadata.txt'):
 rule all:
-        input:  expand(wdir + "/QC/{sample}_trimmed_R1_fastqc.html", sample=samples),
-                expand(wdir + "/QC/{sample}_R1_fastqc.html", sample=samples),
+        input:  expand(wdir + "/QC/trimFastqc/{sample}_trimmed_R1_fastqc.html", sample=samples),
+                expand(wdir + "/QC/rawFastqc/{sample}_R1_fastqc.html", sample=samples),
                 expand(wdir + "/bam/{sample}.sorted.markdup.bam.bai", sample=samples),
                 expand(wdir + "/Genrich/{sample}.genrich.RPM.bw", sample=samples),
                 wdir + "/multiqc.html",
@@ -54,21 +54,21 @@ cutadapt -j {clusterConfig[cutadapt][threads]} -b file:{program.adapters} -B fil
 rule fastqc:
         input: R1 = wdir + "/fastq2/{sample}_trimmed_R1.fastq.gz", 
                R2 = wdir + "/fastq2/{sample}_trimmed_R2.fastq.gz"
-        output: forward = wdir + "/QC/{sample}_trimmed_R1_fastqc.html", 
-                reverse = wdir + "/QC/{sample}_trimmed_R2_fastqc.html", 
+        output: forward = wdir + "/QC/trimFastqc/{sample}_trimmed_R1_fastqc.html", 
+                reverse = wdir + "/QC/trimFastqc/{sample}_trimmed_R2_fastqc.html", 
         shell:  """
 module load {program.fastQC} 
-fastqc -o "QC" --noextract -k 5 -t {clusterConfig[fastqc][threads]} -f fastq {input.R1} {input.R2}
+fastqc -o "QC/trimFastqc" --noextract -k 5 -t {clusterConfig[fastqc][threads]} -f fastq {input.R1} {input.R2}
 """
 
 rule fastqc1:
         input: R1 = sourcedir + "{sample}_R1.fastq.gz",
                R2 = sourcedir + "{sample}_R2.fastq.gz"
-        output: forward = wdir + "/QC/{sample}_R1_fastqc.html", 
-                reverse = wdir + "/QC/{sample}_R2_fastqc.html", 
+        output: forward = wdir + "/QC/rawFastqc/{sample}_R1_fastqc.html", 
+                reverse = wdir + "/QC/rawFastqc/{sample}_R2_fastqc.html", 
         shell: """
 module load {program.fastQC} 
-fastqc -o "QC" --noextract -k 5 -t {clusterConfig[fastqc][threads]} -f fastq {input.R1} {input.R2}
+fastqc -o "QC/rawFastqc" --noextract -k 5 -t {clusterConfig[fastqc][threads]} -f fastq {input.R1} {input.R2}
 """
 
 rule seqtk:
@@ -292,6 +292,7 @@ plotPCA -in {input} -o {output} --outFileNameData Deeptools/PCA.tab
 
 rule alignmentSieve:
     input: sortBam = wdir + "/bam/{sample}.sorted.markdup.bam"
+           bai = wdir + "/bam/{sample}.sorted.markdup.bam.bai",
     output: bam = temp(wdir + "/bam/{sample}.sorted.markdup.filtered.bam"), 
            sort = temp(wdir + "/bam/{sample}.sorted.markdup.filtered.sorted.bam")
     params: smp = "{sample}"

@@ -26,6 +26,14 @@ if (genome == "mm10") {
     orgdb = "org.Hs.eg.db"
     organism = "hsa"
 }else if(genome == "rheMac10" ){
+  if (!requireNamespace("org.Mmu.eg.db", quietly = TRUE)) {
+    if (!requireNamespace("BiocManager", quietly = TRUE)) { install.packages("BiocManager") }
+    BiocManager::install("org.Mmu.eg.db")
+  }
+  if (!requireNamespace("TxDb.Mmulatta.UCSC.rheMac10.refGene", quietly = TRUE)) {
+    if (!requireNamespace("BiocManager", quietly = TRUE)) { install.packages("BiocManager") }
+    BiocManager::install("TxDb.Mmulatta.UCSC.rheMac10.refGene")
+  }
   library(org.Mmu.eg.db)
   library(TxDb.Mmulatta.UCSC.rheMac10.refGene)
   txdb <- TxDb.Mmulatta.UCSC.rheMac10.refGene
@@ -39,6 +47,7 @@ nm <- lapply(gsub('.narrowPeak', '' , lapply(gsub('.*/Genrich/', '', input1), fu
 
 print (input1)
 names(input1) <- nm
+input1 <- input1[order(names(input1))]
 
 #########################################################
 ## Profile of ChIP peaks binding to TSS regions
@@ -48,8 +57,14 @@ tagMatrixList_all <- lapply(input1, getTagMatrix, windows=promoter)
 tagMatrixList <- tagMatrixList_all[sapply(tagMatrixList_all, nrow) > 0]
 
 if (is.list(tagMatrixList) & length(tagMatrixList) != 0) {
+  if (length(input1) <= 10) { rel_size=1; ncolLegend=1 
+  } else if (length(input1) <= 40) {rel_size=0.8; ncolLegend=1 
+  } else {rel_size=0.4; ncolLegend=2}
   png('Average_Profile_of_ATAC_peaks_binding_to_TSS_region_mqc.png',res = 200, width = 6, height = 4, units = "in")
-  print(plotAvgProf(tagMatrixList, xlim=c(-3000, 3000), xlab="Genomic Region (5'->3')", ylab = "Frequency"))
+  p <- plotAvgProf(tagMatrixList, xlim=c(-3000, 3000), xlab="Genomic Region (5'->3')", ylab = "Frequency")
+  p <- p + theme(legend.text=element_text(size=rel(rel_size)), legend.key.size = unit(0.2, "cm")) +
+           guides(color=guide_legend(ncol=ncolLegend))
+  print(p)
   dev.off()
 }
 
@@ -58,7 +73,13 @@ if (is.list(tagMatrixList) & length(tagMatrixList) != 0) {
 #########################################################
 png('Genomic_Annotation_among_different_ATACseq_data_mqc.png',res = 200, width = 6, height = 4, units = "in")
 peakAnnoList <- lapply(input1, annotatePeak, TxDb=txdb, tssRegion=c(-3000, 3000), verbose=FALSE)
-plotAnnoBar(peakAnnoList)
+
+if (length(input1) <= 10) { rel_size=1 
+} else if (length(input1) <= 40) {rel_size=0.8
+} else {rel_size=0.4}
+p <- plotAnnoBar(peakAnnoList)
+p <- p + theme(axis.text.y=element_text(size=rel(rel_size)))
+print(p)
 dev.off()
 
 #########################################################
@@ -66,6 +87,11 @@ dev.off()
 #########################################################
 
 png('Distribution_of_Binding_Sites_among_different_ATACseq_data_mqc.png', res = 200, width = 8, height = 4, units = "in")
-plotDistToTSS(peakAnnoList)
+if (length(input1) <= 10) { rel_size=1 
+} else if (length(input1) <= 40) {rel_size=0.8 
+} else {rel_size=0.4}
+p <- plotDistToTSS(peakAnnoList)
+p <- p + theme(axis.text.y=element_text(size=rel(rel_size)))
+print(p)
 dev.off()
 
