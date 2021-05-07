@@ -10,11 +10,11 @@ Running SF's ATAC-seq pipeline on Biowulf:
 Options are: "hg38", "hg19", "mm10, "mm9", and "rheMac10".
 
 i.e.
-   
+```
 { "ref": "hg38",
-  "projectID": "NCBR-test",
+  "projectID": "NCBR-test"
 }
-
+```
 4. To run a dry run:  
    module load snakemake/5.5.2  
    snakemake -npr  
@@ -29,7 +29,7 @@ Group names may not contain any of the following symbols: "-", ".", "_".
 For groups, each sample should be listed using "samplename" as defined in step 2 above. Samples can be placed in more than one group. Contrasts must each be given a unique key for organization in the json (no matter how many contrasts there are), but they can be anything you like and will not be incorporated into the analysis in any way.
 
 i.e.
-   
+```
 { "ref": "hg38",
   "projectID": "NCBR-test",
   "groups": { "EV": ["EVp1", "EVp3", "EVp5"],
@@ -38,7 +38,7 @@ i.e.
   "contrasts": { "1": ["OE", "EV"]
                }
 }
-
+```
 2. To run a dry run:  
    module load snakemake/5.5.2  
    snakemake -npr -s Snakefile.Differential  
