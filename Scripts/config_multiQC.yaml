@@ -47,6 +47,7 @@ module_order:
             - '*trimmed_R1_fastqc.zip'
             - '*trimmed_R2_fastqc.zip'
 
+samtools_idxstats_fraction_cutoff: 0.000000000000001
 
 fastqscreen_simpleplot: true
 

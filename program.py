@@ -1,7 +1,7 @@
 #program path
 cutadapt = "cutadapt/1.18"
 #adapters = "/data/CCBR_Pipeliner/db/PipeDB/dev/TruSeq_and_nextera_adapters.consolidated.fa"
-adapters = "SF_TruSeqv3_adapters.fa"
+adapters = "Scripts/SF_TruSeqv3_adapters.fa"
 fastQC = "fastqc/0.11.8"
 seqtk = "seqtk/1.2-r102"
 fastq_screen = "fastq_screen/0.14.0"

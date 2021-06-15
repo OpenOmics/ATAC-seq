@@ -38,8 +38,6 @@ rule all:
                 expand(wdir + "/bam/{sample}.sorted.markdup.bam.bai", sample=samples),
                 expand(wdir + "/Genrich/{sample}.genrich.RPM.bw", sample=samples),
                 wdir + "/multiqc.html",
-                wdir + "/Deeptools/PCA.png",
-                #peak_result,
 
 rule cutadapt:
         input: R1 = sourcedir + "{sample}_R1.fastq.gz", 
@@ -151,9 +149,13 @@ java -Xmx{clusterConfig[markdup][mem]} -jar $PICARDJARPATH/picard.jar MarkDuplic
 """
 
 rule markdupIndex:
-    input:wdir +"/bam/{sample}.sorted.markdup.bam"
-    output:wdir+ "/bam/{sample}.sorted.markdup.bam.bai"
-    shell: "module load {program.samtools}; samtools index {input}"
+    input: wdir +"/bam/{sample}.sorted.markdup.bam"
+    output: bai = wdir+ "/bam/{sample}.sorted.markdup.bam.bai",
+            idx = wdir+ "/bam/{sample}.sorted.markdup.bam.idxstat"
+    shell: """
+module load {program.samtools}; samtools index {input}
+samtools idxstats {input} > {output.idx}
+"""
 
 if config["ref"] == "rheMac10":
     rule genrich:
@@ -291,7 +293,7 @@ plotPCA -in {input} -o {output} --outFileNameData Deeptools/PCA.tab
             """
 
 rule alignmentSieve:
-    input: sortBam = wdir + "/bam/{sample}.sorted.markdup.bam"
+    input: sortBam = wdir + "/bam/{sample}.sorted.markdup.bam",
            bai = wdir + "/bam/{sample}.sorted.markdup.bam.bai",
     output: bam = temp(wdir + "/bam/{sample}.sorted.markdup.filtered.bam"), 
            sort = temp(wdir + "/bam/{sample}.sorted.markdup.filtered.sorted.bam")
@@ -357,7 +359,7 @@ rule ChIPseeker:
     shell: "module load {program.rver}; Rscript {program.chipseeker} {config[ref]} {input}"
 
 rule multiqc:
-    input: expand(wdir + "/bam/{sample}.sorted.markdup.bam", sample=samples), 
+    input: expand(wdir + "/bam/{sample}.sorted.markdup.bam.idxstat", sample=samples), 
            expand(wdir + "/QC/{sample}.kraken2.report.txt", sample=samples), 
            expand(wdir+ "/QC/{sample}_trimmed_R1.sub_screen.png", sample=samples), 
            expand(wdir +"/QC/{sample}_trimmed_R2.sub_screen.png", sample=samples),
