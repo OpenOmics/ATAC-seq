@@ -45,3 +45,11 @@ i.e.
 
 3. To run the pipeline, edit the header of submit.sbatch to your email address and then:  
     sbatch submit_Differential.sbatch  
+
+For Differential Analyses (bam and narrowPeak files from SF):
+
+1. Copy the contents of this folder to a new working directory.
+
+2. Create a folder within the working directory called "bam" containing the bam files from SF and a folder called "Genrich" containing the narrowPeak files from SF. Note: this is designed to work with SF naming conventions.
+
+3. Follow the steps for differential analyses as described above.

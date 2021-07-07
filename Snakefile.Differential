@@ -12,7 +12,6 @@ import reference
 wdir = os.getcwd()
 sourcedir = wdir + "/fastq/"
 
-
 with open(wdir + '/cluster.json') as file:
     clusterConfig = json.load(file)
 
@@ -33,8 +32,9 @@ for item in samps:
                 new.append(item)
 samples = new
 
-#### need to get group and contrast information incorporated here
-# missing variables from rule all: contrasts
+#### if there are no fastq files:
+if len(samples) == 0:
+   samples = [os.path.basename(file).split('.')[0] for file in glob.glob(wdir + "/bam"+'/*')]
 
 PeakTools = ['Diffbind_EdgeR','Diffbind_Deseq2']
 UropaCats = ["genes","TSSgenes","prot","TSSprot"]
@@ -66,7 +66,6 @@ if config["ref"] == "rheMac10":
             expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),
             expand(join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}","knownResults.txt"),PeakTool=PeakTools,name=contrasts),
             expand(join(wdir,Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits.txt"),name=contrasts,PeakTool=PeakTools,type=UropaCats[0:2]),
-#            expand(join(wdir,Homer_Dir2,"{name}","{name}-{PeakTool}.annotations.merged.txt"),PeakTool=PeakTools,name=contrasts)
 else:
     rule all:
         input:
@@ -74,21 +73,28 @@ else:
             expand(join(wdir,Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits.txt"),name=contrasts,PeakTool=PeakTools,type=UropaCats),
             expand(join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}","knownResults.txt"),PeakTool=PeakTools,name=contrasts),
 
+rule markdup:
+    input: wdir + "/bam/{sample}.sorted.bam"
+    output: out = wdir +"/bam/{sample}.sorted.markdup.bam", 
+    shell: """
+module load {program.markedup}
+#module load {program.samtools}
+if [ ! -e /lscratch/$SLURM_JOBID ]; then mkdir /lscratch/$SLURM_JOBID ;fi
+java -Xmx{clusterConfig[markdup][mem]} -jar $PICARDJARPATH/picard.jar MarkDuplicates INPUT={input} OUTPUT={output.out} ASSUME_SORTED=true CREATE_INDEX=true MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 VALIDATION_STRINGENCY=LENIENT TMP_DIR=/lscratch/$SLURM_JOBID
+"""
 
-# this is to allow the dryrun even though the first half of the pipeline doesn't exist
-rule tmp:
-        input: R1 = sourcedir + "{sample}_R1.fastq.gz", 
-               R2 = sourcedir + "{sample}_R2.fastq.gz"
-        output: wdir +"/bam/{sample}.sorted.markdup.bam",
-                wdir+"/Genrich/{sample}.narrowPeak"
-        shell:"ls"
-
-# need to update output bed files: there will be 3: positive, negative, and all. bed file all is the only one that should be an input for uropa, but all three are inputs for Homer
-# consensus output bed files are also created in the DiffBind script but they have no function downstream so they are not needed in the list of outputs
+rule markdupIndex:
+    input: wdir +"/bam/{sample}.sorted.markdup.bam"
+    output: bai = wdir+ "/bam/{sample}.sorted.markdup.bam.bai",
+            idx = wdir+ "/bam/{sample}.sorted.markdup.bam.idxstat"
+    shell: """
+module load {program.samtools}; samtools index {input}
+samtools idxstats {input} > {output.idx}
+"""
 
 rule diffbind:
     input:
-        expand(wdir +"/bam/{sample}.sorted.markdup.bam",sample=samples),
+        expand(wdir +"/bam/{sample}.sorted.markdup.bam.bai",sample=samples),
         expand(wdir+"/Genrich/{sample}.narrowPeak",sample=samples)
     output:
         outtxt0=join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}-" + PeakTools[0] + ".txt"),
@@ -189,7 +195,7 @@ if config["ref"] == "rheMac10":
             json = join(wdir, Uropa_Dir,"{name}","{name}.{PeakTool}.{type}.json"),
             outroot = join(wdir, Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}")
         shell: """
-module load {program.uropaver};
+module load {program.uropaverRh};
 if [ ! -e {params.fldr} ]; then mkdir {params.fldr}; fi
 echo '{{"queries":[ ' > {params.json}
 if [ '{wildcards.type}' == 'genes' ]; then
@@ -259,4 +265,3 @@ Rscript {program.Mergerscript} {input.txt} {output.outbase}
 awk -F'\\t' '{{if (NR==1) print $0; else if ((NR>1) && ($8>=0)) print $0}}' {output.outmergebase} > {output.outmergepos}
 awk -F'\\t' '{{if (NR==1) print $0; else if ((NR>1) && ($8<0)) print $0}}' {output.outmergebase} > {output.outmergeneg}
 """
-
