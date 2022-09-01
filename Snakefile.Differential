@@ -75,12 +75,13 @@ else:
 
 rule markdup:
     input: wdir + "/bam/{sample}.sorted.bam"
-    output: out = wdir +"/bam/{sample}.sorted.markdup.bam", 
+    output: 
+        out = wdir +"/bam/{sample}.sorted.markdup.bam",
+        out1= wdir +"/bam/{sample}.duplic",
     shell: """
 module load {program.markedup}
-#module load {program.samtools}
 if [ ! -e /lscratch/$SLURM_JOBID ]; then mkdir /lscratch/$SLURM_JOBID ;fi
-java -Xmx{clusterConfig[markdup][mem]} -jar $PICARDJARPATH/picard.jar MarkDuplicates INPUT={input} OUTPUT={output.out} ASSUME_SORTED=true CREATE_INDEX=true MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 VALIDATION_STRINGENCY=LENIENT TMP_DIR=/lscratch/$SLURM_JOBID
+java -Xmx{clusterConfig[markdup][mem]} -jar $PICARDJARPATH/picard.jar MarkDuplicates INPUT={input} OUTPUT={output.out} ASSUME_SORTED=true CREATE_INDEX=true MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 VALIDATION_STRINGENCY=LENIENT TMP_DIR=/lscratch/$SLURM_JOBID METRICS_FILE={output.out1}
 """
 
 rule markdupIndex:
