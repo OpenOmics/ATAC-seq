@@ -70,7 +70,7 @@ else:
     rule all:
         input:
             expand(join(wdir,DiffBind_Dir,"{group1}_vs_{group2}","{group1}_vs_{group2}_Diffbind.html"),zip,group1=zipGroup1,group2=zipGroup2),
-            expand(join(wdir,Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits.txt"),name=contrasts,PeakTool=PeakTools,type=UropaCats),
+            expand(join(wdir,Uropa_Dir,"{name}","{name}-{PeakTool}_uropa_{type}_finalhits.txt"),name=contrasts,PeakTool=PeakTools,type=UropaCats[0:4]),
             expand(join(wdir,Homer_Dir,"{name}","{name}-{PeakTool}","knownResults.txt"),PeakTool=PeakTools,name=contrasts),
 
 rule markdup:
