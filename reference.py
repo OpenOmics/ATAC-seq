@@ -40,3 +40,4 @@ if config["ref"] == "rheMac10":
     blacklist = ""
     sizes = "/data/NCBR/references/RheMac10/rheMac10.chrom.sizes"
     deeptools_bed = "/data/NCBR/references/RheMac10/rheMac10.ncbiRefSeq.deeptools.sorted.merged.bed"
+    gtf = "/data/NCBR/references/RheMac10/rheMac10.ncbiRefSeq.genes.gtf"
